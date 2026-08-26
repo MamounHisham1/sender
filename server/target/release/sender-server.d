@@ -1,0 +1,1 @@
+/home/mamoun/ai/sender/server/target/release/sender-server: /home/mamoun/ai/sender/server/src/clip.rs /home/mamoun/ai/sender/server/src/main.rs /home/mamoun/ai/sender/server/src/proto.rs /home/mamoun/ai/sender/server/src/store.rs

@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Sender",
+    "slug": "sender",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "androidStatusBar": { "translucent": true },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0e1116",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "INTERNET"]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        { "cameraPermission": "Allow Sender to take photos to send to your laptop." }
+      ]
+    ],
+    "extra": {
+      "serverPort": 8787
+    }
+  }
+}

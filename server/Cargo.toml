@@ -1,0 +1,23 @@
+[package]
+name = "sender-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+arboard = { version = "3", features = ["wayland-data-control"] }
+ratatui = "0.28"
+crossterm = "0.28"
+local-ip-address = "0.6"
+rand = "0.8"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
+dirs = "5"
+
+[profile.release]
+opt-level = 2
+lto = true

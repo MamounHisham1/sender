@@ -1,0 +1,13 @@
+.env
+*.keystore
+*.jks
+node_modules/
+vendor/
+build/
+build_app/
+.dart_tool/
+.gradle/
+*.iml
+.idea/
+__pycache__/
+venv/
