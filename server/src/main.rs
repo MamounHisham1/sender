@@ -1,5 +1,6 @@
 mod clip;
 mod proto;
+mod qr;
 mod store;
 
 use clip::{ClipCmd, ClipGet, spawn_clipboard};
@@ -34,6 +35,7 @@ struct State {
     phone: Option<String>,
     log: VecDeque<String>,
     input: String,
+    show_qr: bool,
 }
 
 impl State {
@@ -80,6 +82,8 @@ async fn run_headless() -> io::Result<()> {
     let pin = store::load_or_create_pin()?;
     let ip = local_ip();
     let addr = format!("ws://{ip}:{PORT}");
+    let host_with_port = format!("{ip}:{PORT}");
+    let pair = qr::pair_url(&host_with_port, &pin);
 
     let (out_tx, _) = broadcast::channel::<Msg>(128);
     let (ui_tx, mut ui_rx) = mpsc::unbounded_channel::<UiEvent>();
@@ -109,6 +113,8 @@ async fn run_headless() -> io::Result<()> {
 
     println!("pair url  {addr}");
     println!("pin       {pin}");
+    println!("qr        {pair}");
+    println!("{}", qr::qr_text(&pair));
     println!("type a line + Enter to send it to the phone; Ctrl-D to quit");
 
     // stdin → phone (only for interactive terminals; piped/empty stdin would EOF instantly)
@@ -186,6 +192,7 @@ async fn run() -> io::Result<()> {
     let pin = store::load_or_create_pin()?;
     let ip = local_ip();
     let addr = format!("ws://{ip}:{PORT}");
+    let pair = qr::pair_url(&format!("{ip}:{PORT}"), &pin);
 
     let (out_tx, _) = broadcast::channel::<Msg>(128);
     let (ui_tx, mut ui_rx) = mpsc::unbounded_channel::<UiEvent>();
@@ -209,11 +216,12 @@ async fn run() -> io::Result<()> {
     });
 
     let mut terminal = init_terminal()?;
-    let mut st = State { phone: None, log: VecDeque::new(), input: String::new() };
+    let mut st = State { phone: None, log: VecDeque::new(), input: String::new(), show_qr: true };
     st.log(format!("pair url  {addr}"));
     st.log(format!("pin       {pin}"));
+    st.log("scan the QR on the right (r toggles) or enter PIN manually".to_string());
     let res = tui_loop(
-        &mut terminal, &mut st, &addr, &pin, &ip,
+        &mut terminal, &mut st, &addr, &pin, &ip, &pair,
         out_tx.clone(), ui_tx.clone(), clip_tx.clone(),
         &mut ui_rx, &mut key_rx,
     )
@@ -245,6 +253,7 @@ async fn tui_loop(
     addr: &str,
     pin: &str,
     ip: &str,
+    pair: &str,
     out_tx: broadcast::Sender<Msg>,
     ui_tx: mpsc::UnboundedSender<UiEvent>,
     clip_tx: mpsc::Sender<ClipCmd>,
@@ -256,7 +265,7 @@ async fn tui_loop(
     let mut tick = tokio::time::interval(std::time::Duration::from_millis(250));
 
     loop {
-        terminal.draw(|f| draw(f, st, addr, pin, ip))?;
+        terminal.draw(|f| draw(f, st, addr, pin, ip, pair))?;
 
         tokio::select! {
             maybe_ev = key_rx.recv() => {
@@ -278,6 +287,9 @@ async fn tui_loop(
                         let _ = out_tx.send(Msg::Text { id: new_id(), body, ts: now_ms() });
                     }
                     KeyCode::Backspace => { st.input.pop(); }
+                    KeyCode::Char('r') if st.input.is_empty() => {
+                        st.show_qr = !st.show_qr;
+                    }
                     KeyCode::Char('p') if st.input.is_empty() => {
                         if st.phone.is_none() {
                             st.log("no phone connected yet");
@@ -352,8 +364,8 @@ async fn push_clipboard(
 
 // --- section: draw ---
 
-fn draw(f: &mut Frame, st: &State, addr: &str, pin: &str, ip: &str) {
-    let [header, log_area, input_area, footer] = Layout::vertical([
+fn draw(f: &mut Frame, st: &State, addr: &str, pin: &str, ip: &str, pair: &str) {
+    let [header, body, input_area, footer] = Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(3),
         Constraint::Length(3),
@@ -407,19 +419,44 @@ fn draw(f: &mut Frame, st: &State, addr: &str, pin: &str, ip: &str) {
             Line::styled(l.clone(), style)
         })
         .collect();
-    f.render_widget(
-        Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false }),
-        log_area.inner(Margin { vertical: 0, horizontal: 1 }),
-    );
+    // QR panel on the right (toggle with `r`). Black-on-white so phones
+    // can scan it straight off the screen.
+    let qr_rows = qr::qr_lines(pair);
+    let qr_w = qr_rows.iter().map(|r| r.chars().count()).max().unwrap_or(0) as u16;
+    let show_qr = st.show_qr && qr_w > 0 && f.area().width >= qr_w + 50;
+    if show_qr {
+        let [log_area, qr_area] =
+            Layout::horizontal([Constraint::Min(10), Constraint::Length(qr_w + 4)])
+                .areas(body);
+        f.render_widget(
+            Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false }),
+            log_area.inner(Margin { vertical: 0, horizontal: 1 }),
+        );
+        let qr_wd = Paragraph::new(qr_rows.join("\n"))
+            .alignment(ratatui::layout::Alignment::Center)
+            .style(Style::default().fg(Color::Black).bg(Color::White))
+            .block(
+                Block::new()
+                    .borders(Borders::ALL)
+                    .title(" scan to pair ")
+                    .style(Style::default().bg(Color::White)),
+            );
+        f.render_widget(qr_wd, qr_area);
+    } else {
+        f.render_widget(
+            Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false }),
+            body.inner(Margin { vertical: 0, horizontal: 1 }),
+        );
+    }
 
     let input = Paragraph::new(format!("{}▏", st.input))
         .block(Block::new().borders(Borders::ALL).title(" text to phone "));
     f.render_widget(input, input_area);
 
     let hint = if st.phone.is_some() {
-        "type + Enter send · p push clipboard · q quit"
+        "type + Enter send · p push clipboard · r QR · q quit"
     } else {
-        "waiting… · type anyway · p push clipboard · q quit"
+        "scan QR or type PIN on phone · p push clipboard · r QR · q quit"
     };
     f.render_widget(Span::styled(hint, Style::default().fg(Color::DarkGray)), footer);
 }

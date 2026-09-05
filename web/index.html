@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sender — phone ⇄ laptop sync</title>
+<meta name="description" content="Send text and images between your Android phone and laptop over Wi-Fi. Received items land directly in the device clipboard." />
+<style>
+  :root {
+    --bg: #0e1116; --panel: #141a24; --card: #1c2330;
+    --txt: #eef2f6; --mut: #8aa0b4; --dim: #55606e;
+    --grn: #2ecc71; --grn-dk: #04150c; --cyan: #56c8dc; --mag: #e07be0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--txt); font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Inter, sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 22px 80px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .logo { font-weight: 800; font-size: 20px; }
+  .logo span { background: var(--cyan); color: #000; padding: 2px 10px; border-radius: 8px; margin-right: 8px; }
+  header a { color: var(--mut); text-decoration: none; font-size: 14px; }
+  header a:hover { color: var(--txt); }
+  .hero { text-align: center; padding: 56px 0 30px; }
+  .hero h1 { font-size: clamp(30px, 6vw, 50px); line-height: 1.15; font-weight: 800; }
+  .hero h1 .a { color: var(--grn); } .hero h1 .b { color: var(--cyan); }
+  .hero p { color: var(--mut); max-width: 600px; margin: 16px auto 0; font-size: 17px; }
+  .hero p b { color: var(--txt); }
+  .install { background: var(--panel); border: 1px solid #26303f; border-radius: 14px; padding: 20px; margin: 28px 0 8px; }
+  .install .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--mut); margin-bottom: 10px; }
+  .cmd { display: flex; gap: 10px; align-items: center; background: #000; border-radius: 10px; padding: 12px 14px; overflow-x: auto; }
+  .cmd code { flex: 1; white-space: nowrap; font: 14px ui-monospace, Menlo, Consolas, monospace; color: var(--grn); }
+  .cmd button { background: var(--grn); color: var(--grn-dk); border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+  .cmd button:hover { filter: brightness(1.1); }
+  .osnote { text-align: center; color: var(--dim); font-size: 13px; margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 34px 0; }
+  .card { background: var(--card); border-radius: 12px; padding: 18px; }
+  .card .ic { font-size: 24px; }
+  .card h3 { font-size: 16px; margin: 8px 0 4px; }
+  .card p { color: var(--mut); font-size: 14px; }
+  h2 { font-size: 24px; margin: 44px 0 14px; }
+  ol.steps { list-style: none; counter-reset: s; display: grid; gap: 12px; }
+  ol.steps li { background: var(--panel); border: 1px solid #26303f; border-radius: 12px; padding: 16px 16px 16px 58px; position: relative; }
+  ol.steps li::before { counter-increment: s; content: counter(s); position: absolute; left: 16px; top: 14px; width: 28px; height: 28px; border-radius: 50%; background: var(--grn); color: var(--grn-dk); font-weight: 800; display: grid; place-items: center; }
+  ol.steps code, p code, li code { font: 13.5px ui-monospace, Menlo, Consolas, monospace; background: #000; padding: 2px 7px; border-radius: 6px; color: var(--cyan); }
+  .keys { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .keys td { padding: 9px 10px; border-bottom: 1px solid #26303f; }
+  .keys td:first-child { white-space: nowrap; }
+  .keys kbd { background: var(--card); border: 1px solid #334052; border-radius: 6px; padding: 2px 9px; font: 13px ui-monospace, monospace; }
+  .faq details { background: var(--panel); border: 1px solid #26303f; border-radius: 10px; padding: 13px 16px; margin-bottom: 10px; }
+  .faq summary { cursor: pointer; font-weight: 700; }
+  .faq p { color: var(--mut); font-size: 14.5px; margin-top: 8px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid #26303f; color: var(--dim); font-size: 13.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  footer a { color: var(--mut); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo"><span>Sender</span></div>
+    <a href="https://github.com/mamounhisham1/sender">GitHub ↗</a>
+  </header>
+
+  <div class="hero">
+    <h1>Phone <span class="a">⇄</span> laptop sync,<br />straight into the <span class="b">clipboard</span>.</h1>
+    <p>Send text and images between your Android phone and laptop over Wi-Fi. Anything received lands <b>directly in that device's clipboard</b> — no clicks needed.</p>
+  </div>
+
+  <div class="install">
+    <div class="lbl">Install the server — Linux / macOS</div>
+    <div class="cmd">
+      <code id="cmd">curl -fsSL …/install.sh | bash</code>
+      <button id="copy">Copy</button>
+    </div>
+  </div>
+  <div class="osnote">Downloads a prebuilt binary in seconds — no toolchain needed. Source build available with <code>--build-from-source</code>. <a href="https://github.com/mamounhisham1/sender" style="color:var(--mut)">Source</a></div>
+
+  <div class="grid">
+    <div class="card"><div class="ic">📋</div><h3>Clipboard-direct</h3><p>Received text and images go straight into the OS clipboard on both sides. Laptop images are also saved under <code>~/Pictures/Sender/</code>.</p></div>
+    <div class="card"><div class="ic">📷</div><h3>QR pairing</h3><p>The server shows a QR code. Scan it from the app once — host and PIN fill in automatically.</p></div>
+    <div class="card"><div class="ic">🖼️</div><h3>Text + images</h3><p>Type + Enter sends text, <code>p</code> pushes your laptop clipboard. On the phone: type, pick from gallery, or shoot.</p></div>
+    <div class="card"><div class="ic">🔒</div><h3>LAN-only &amp; PIN-locked</h3><p>Single WebSocket on your local network, gated by a stable 6-digit PIN. Auto-reconnects forever.</p></div>
+  </div>
+
+  <h2>Get running in 2 minutes</h2>
+  <ol class="steps">
+    <li><b>Install &amp; start the server</b> with the command above, then run <code>sender-server</code>. A TUI shows your <code>ws://&lt;ip&gt;:8787</code> address, PIN, and QR code.</li>
+    <li><b>Open the phone app</b> — install <b>Expo Go</b>, run <code>npx expo start</code> in <code>mobile/</code>, open Sender, tap <b>📷 Scan laptop QR</b>.</li>
+    <li><b>Done.</b> Type + Enter on the laptop, or Send on the phone. Long-press any phone bubble to copy it back.</li>
+  </ol>
+
+  <h2>Laptop keys</h2>
+  <table class="keys">
+    <tr><td><kbd>Enter</kbd></td><td>Send typed text to the phone</td></tr>
+    <tr><td><kbd>p</kbd></td><td>Push laptop clipboard (image or text) to the phone</td></tr>
+    <tr><td><kbd>r</kbd></td><td>Toggle the pairing QR panel</td></tr>
+    <tr><td><kbd>q</kbd> / <kbd>Ctrl-C</kbd></td><td>Quit</td></tr>
+  </table>
+
+  <h2>FAQ</h2>
+  <div class="faq">
+    <details><summary>Do both devices need to be on the same Wi-Fi?</summary><p>Yes. The phone connects directly to <code>ws://&lt;laptop-ip&gt;:8787</code> over your local network, so both must be on the same Wi-Fi/LAN. Nothing goes through the cloud.</p></details>
+    <details><summary>Where is my PIN stored?</summary><p>Generated once and kept in <code>~/.config/sender/config.json</code> on the laptop, so you only pair the phone a single time.</p></details>
+    <details><summary>Is there a headless mode?</summary><p>Yes: <code>sender-server --headless [--send "text"]</code> — handy for servers and scripting.</p></details>
+    <details><summary>How do images travel?</summary><p>As base64 JSON frames over the WebSocket, capped at 25 MB per image.</p></details>
+  </div>
+
+  <footer>
+    <span>Sender — local-first phone ⇄ laptop sync.</span>
+    <span><a href="https://github.com/mamounhisham1/sender">github.com/mamounhisham1/sender</a></span>
+  </footer>
+
+</div>
+<script>
+  var url = location.origin + "/install.sh";
+  var oneLiner = "curl -fsSL " + url + " | bash";
+  document.getElementById("cmd").textContent = oneLiner;
+  document.getElementById("copy").onclick = function () {
+    var b = this;
+    navigator.clipboard.writeText(oneLiner).then(function () {
+      b.textContent = "Copied!";
+      setTimeout(function () { b.textContent = "Copy"; }, 1500);
+    });
+  };
+</script>
+</body>
+</html>

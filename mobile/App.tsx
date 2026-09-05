@@ -13,8 +13,10 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSenderConn, ConnState, FeedItem } from './src/useSenderConn';
 import { loadPairing, savePin, saveHost, laptopHostFromExpo, normalizeHost, Pairing } from './src/config';
+import { parsePairPayload } from './src/pairing';
 import { pickImage, makeImgMsg, copyText, copyImage } from './src/media';
 import { newId } from './src/protocol';
 
@@ -87,6 +89,12 @@ export default function App() {
         setPinInput={setPinInput}
         setHostInput={setHostInput}
         onSubmit={() => { submitSetup(); setShowSetup(false); }}
+        onScanned={(host, pin) => {
+          void savePin(pin);
+          void saveHost(host);
+          setPairing({ host, pin });
+          setShowSetup(false);
+        }}
         detected={laptopHostFromExpo()}
       />
     );
@@ -192,18 +200,69 @@ function SetupScreen(props: {
   setPinInput: (v: string) => void;
   setHostInput: (v: string) => void;
   onSubmit: () => void;
+  onScanned: (host: string, pin: string) => void;
   detected: string | null;
 }) {
-  const { pinInput, hostInput, setPinInput, setHostInput, onSubmit, detected } = props;
+  const { pinInput, hostInput, setPinInput, setHostInput, onSubmit, onScanned, detected } = props;
   const valid = /^\d{6}$/.test(pinInput) && (hostInput.length > 0 || !!detected);
+  const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanError, setScanError] = useState('');
+
+  const startScan = useCallback(async () => {
+    setScanError('');
+    if (!permission?.granted) {
+      const res = await requestPermission();
+      if (!res.granted) {
+        setScanError('Camera permission needed to scan the QR.');
+        return;
+      }
+    }
+    setScanning(true);
+  }, [permission, requestPermission]);
+
+  if (scanning) {
+    return (
+      <View style={st.scanWrap}>
+        <StatusBar style="light" />
+        <CameraView
+          style={st.camera}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={res => {
+            const parsed = parsePairPayload(res.data);
+            if (parsed) {
+              setScanning(false);
+              onScanned(parsed.host, parsed.pin);
+            } else {
+              setScanError('That QR is not a Sender code — try again.');
+            }
+          }}
+        />
+        <View style={st.scanOverlay}>
+          <Text style={st.scanHint}>Point at the QR on your laptop</Text>
+          {!!scanError && <Text style={st.scanErr}>{scanError}</Text>}
+          <Pressable style={st.cancelBtn} onPress={() => setScanning(false)}>
+            <Text style={st.goTxt}>Cancel</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={st.setupWrap} keyboardShouldPersistTaps="handled">
       <StatusBar style="light" />
       <Text style={st.logo}>Sender</Text>
       <Text style={st.hint}>
-        Start the TUI on your laptop, then enter the PIN it shows.
+        Scan the QR on your laptop — or enter the PIN manually.
         {'\n'}Laptop address is detected automatically over Wi-Fi.
       </Text>
+
+      <Pressable style={st.scanBtn} onPress={() => void startScan()}>
+        <Text style={st.scanBtnTxt}>📷 Scan laptop QR</Text>
+      </Pressable>
+      {!!scanError && <Text style={st.scanErrCenter}>{scanError}</Text>}
 
       <Text style={st.label}>Laptop address</Text>
       <TextInput
@@ -280,4 +339,13 @@ const st = StyleSheet.create({
   },
   goBtn: { backgroundColor: '#2ecc71', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 30 },
   goTxt: { color: '#04150c', fontWeight: '800', fontSize: 16 },
+  scanBtn: { backgroundColor: '#1c2330', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 6, borderWidth: 1, borderColor: '#2ecc71' },
+  scanBtnTxt: { color: '#2ecc71', fontWeight: '800', fontSize: 16 },
+  scanErr: { color: '#e74c3c', textAlign: 'center', marginTop: 8 },
+  scanErrCenter: { color: '#e74c3c', textAlign: 'center', marginTop: 10 },
+  scanWrap: { flex: 1, backgroundColor: '#000' },
+  camera: { flex: 1 },
+  scanOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.55)' },
+  scanHint: { color: '#fff', fontSize: 15, marginBottom: 12, textAlign: 'center' },
+  cancelBtn: { backgroundColor: '#2ecc71', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 32, marginTop: 8 },
 });

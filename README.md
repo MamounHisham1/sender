@@ -16,11 +16,13 @@ Anything received on either side lands **directly in that device's clipboard**
    ```
    cd server && cargo run --release
    ```
-   A TUI shows `ws://<laptop-ip>:8787` and a 6-digit PIN (stable across runs,
-   stored in `~/.config/sender/config.json`).
-2. On the phone: install **Expo Go**, then scan the QR code from
-   `cd mobile && npx expo start`. The app auto-detects the laptop's IP from
-   Expo's dev server; enter the PIN once.
+   The TUI shows `ws://<laptop-ip>:8787`, a 6-digit PIN (stable across runs,
+   stored in `~/.config/sender/config.json`), and a **QR code**
+   (`sender://pair?host=...&pin=...`, `r` toggles it).
+2. On the phone: install **Expo Go**, run `cd mobile && npx expo start`,
+   open Sender, tap **📷 Scan laptop QR** and point at the laptop's QR.
+   It fills host + PIN and connects. Manual entry still works as fallback
+   (laptop IP is auto-detected from Expo's dev server).
 3. Done — after that just keep both apps running on the same Wi-Fi.
 
 ## Day-to-day
