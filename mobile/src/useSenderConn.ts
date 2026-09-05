@@ -57,6 +57,7 @@ export function useSenderConn({ host, pin, deviceName }: Options) {
 
   const connect = useCallback(() => {
     const gen = ++genRef.current;
+    stoppedRef.current = false;
     setState('connecting');
 
     let ws: WebSocket;
@@ -68,8 +69,18 @@ export function useSenderConn({ host, pin, deviceName }: Options) {
     }
     wsRef.current = ws;
 
+    // A socket that never opens (e.g. packets vanishing into a wrong
+    // network) would otherwise wedge us on the spinner forever — force
+    // it closed so the normal retry path runs.
+    const openTimer = setTimeout(() => {
+      if (gen === genRef.current && ws.readyState !== WebSocket.OPEN) {
+        try { ws.close(); } catch {}
+      }
+    }, 10000);
+
     ws.onopen = () => {
       if (gen !== genRef.current) return;
+      clearTimeout(openTimer);
       failCountRef.current = 0;
       setState('authenticating');
       // Server demands hello{pin} as the very first message.
@@ -108,6 +119,7 @@ export function useSenderConn({ host, pin, deviceName }: Options) {
     };
 
     ws.onclose = () => {
+      clearTimeout(openTimer);
       if (gen !== genRef.current || stoppedRef.current) return;
       scheduleReconnect(gen);
     };

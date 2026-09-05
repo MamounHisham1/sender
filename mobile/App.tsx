@@ -112,19 +112,19 @@ export default function App() {
         <StateBadge state={conn.state} onPress={() => setShowSetup(true)} />
       </View>
 
-      <FlatList
-        style={st.feed}
-        data={conn.feed}
-        inverted
-        keyExtractor={it => it.id}
-        renderItem={({ item }) => <FeedRow item={item} onCopy={() => void copyItem(item)} />}
-        ListEmptyComponent={
-          <Text style={st.empty}>
-            Connected. Anything you send shows on the laptop instantly — and lands in its clipboard.
-            {'\n\n'}Long-press a bubble to copy it back to this phone's clipboard.
-          </Text>
-        }
-      />
+      {conn.feed.length > 0 ? (
+        <FlatList
+          style={st.feed}
+          data={conn.feed}
+          inverted
+          keyExtractor={it => it.id}
+          renderItem={({ item }) => <FeedRow item={item} onCopy={() => void copyItem(item)} />}
+        />
+      ) : (
+        <View style={st.feedFill}>
+          <EmptyState state={conn.state} host={host} onRetry={conn.reconnectNow} onCancel={conn.disconnect} />
+        </View>
+      )}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={st.composer}>
@@ -175,6 +175,38 @@ function StateBadge({ state, onPress }: { state: ConnState; onPress: () => void 
         ? <ActivityIndicator size="small" color={color} />
         : <Text style={[st.badgeTxt, { color }]}>{STATE_LABEL[state]}</Text>}
     </Pressable>
+  );
+}
+
+function EmptyState({ state, host, onRetry, onCancel }: { state: ConnState; host: string; onRetry: () => void; onCancel: () => void }) {
+  if (state === 'open') {
+    return (
+      <Text style={st.empty}>
+        Connected. Anything you send shows on the laptop instantly — and lands in its clipboard.
+        {'\n\n'}Long-press a bubble to copy it back to this phone's clipboard.
+      </Text>
+    );
+  }
+  const msg =
+    state === 'authenticating' ? `Link open — waiting for the laptop to accept the PIN…` :
+    state === 'unreachable' ? `Can't reach ${host}.\n\nCheck: same Wi-Fi (turn mobile data off), server running on the laptop, firewall allows port 8787.` :
+    state === 'badpin' ? `The laptop rejected the PIN. Tap the badge above to re-pair.` :
+    state === 'closed' || state === 'idle' ? `Not connected.` :
+    `Connecting to ${host}…`;
+  return (
+    <View style={st.emptyWrap}>
+      <Text style={st.empty}>{msg}</Text>
+      {(state === 'unreachable' || state === 'closed') && (
+        <Pressable style={st.retryBtn} onPress={onRetry}>
+          <Text style={st.retryTxt}>Retry now</Text>
+        </Pressable>
+      )}
+      {(state === 'connecting' || state === 'authenticating') && (
+        <Pressable style={st.retryBtn} onPress={onCancel}>
+          <Text style={st.retryTxt}>Cancel</Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -312,7 +344,11 @@ const st = StyleSheet.create({
   badge: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
   badgeTxt: { fontSize: 12, fontWeight: '700' },
   feed: { flex: 1, paddingHorizontal: 10 },
+  feedFill: { flex: 1, justifyContent: 'center', paddingHorizontal: 10 },
   empty: { color: '#667', textAlign: 'center', marginTop: 40, paddingHorizontal: 30, lineHeight: 20 },
+  emptyWrap: { alignItems: 'center', marginTop: 40, paddingHorizontal: 30 },
+  retryBtn: { marginTop: 16, borderWidth: 1, borderColor: '#2ecc71', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
+  retryTxt: { color: '#2ecc71', fontWeight: '800' },
   row: { maxWidth: '85%', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, marginVertical: 4 },
   rowIn: { alignSelf: 'flex-start', backgroundColor: '#1c2330' },
   rowOut: { alignSelf: 'flex-end', backgroundColor: '#153a2c' },

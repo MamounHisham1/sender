@@ -72,7 +72,7 @@
       <button id="copy">Copy</button>
     </div>
   </div>
-  <div class="osnote">Downloads a prebuilt binary in seconds — no toolchain needed. Source build available with <code>--build-from-source</code>. <a href="https://github.com/mamounhisham1/sender" style="color:var(--mut)">Source</a></div>
+  <div class="osnote">Downloads a prebuilt binary in seconds, starts it in the background, and enables start-on-boot. <code>--no-service</code> opts out. <a href="https://github.com/mamounhisham1/sender" style="color:var(--mut)">Source</a></div>
 
   <div class="grid">
     <div class="card"><div class="ic">📋</div><h3>Clipboard-direct</h3><p>Received text and images go straight into the OS clipboard on both sides. Laptop images are also saved under <code>~/Pictures/Sender/</code>.</p></div>
@@ -100,7 +100,7 @@
   <div class="faq">
     <details><summary>Do both devices need to be on the same Wi-Fi?</summary><p>Yes. The phone connects directly to <code>ws://&lt;laptop-ip&gt;:8787</code> over your local network, so both must be on the same Wi-Fi/LAN. Nothing goes through the cloud.</p></details>
     <details><summary>Where is my PIN stored?</summary><p>Generated once and kept in <code>~/.config/sender/config.json</code> on the laptop, so you only pair the phone a single time.</p></details>
-    <details><summary>Is there a headless mode?</summary><p>Yes: <code>sender-server --headless [--send "text"]</code> — handy for servers and scripting.</p></details>
+    <details><summary>Is there a headless mode?</summary><p>Yes — and it's the default after installing: the installer sets up a background service (<code>systemd</code> on Linux, <code>launchd</code> on macOS) running <code>sender-server --headless</code>, started now and on every login/boot. Logs: <code>journalctl --user -u sender -f</code>. Run the TUI manually with <code>sender-server</code> after <code>systemctl --user stop sender</code>.</p></details>
     <details><summary>How do images travel?</summary><p>As base64 JSON frames over the WebSocket, capped at 25 MB per image.</p></details>
   </div>
 

@@ -17,12 +17,14 @@ VERSION="${SENDER_VERSION:-latest}"
 DEST="${SENDER_DIR:-$HOME/.local/share/sender}"
 BIN_DIR="${SENDER_BIN_DIR:-$HOME/.local/bin}"
 FROM_SOURCE=0
+NO_SERVICE=0
 
 for arg in "$@"; do
   case "$arg" in
     --build-from-source) FROM_SOURCE=1 ;;
+    --no-service) NO_SERVICE=1 ;;
     -h|--help)
-      echo "Usage: install.sh [--build-from-source]"
+      echo "Usage: install.sh [--build-from-source] [--no-service]"
       echo "  Env: SENDER_VERSION=<tag|latest>  SENDER_BIN_DIR=<dir>  SENDER_DIR=<dir>"
       exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 1 ;;
@@ -60,12 +62,97 @@ install_binary() {
 
 print_next_steps() {
   echo
-  ok "Done! Start the server with:"
-  echo "    sender-server"
+  if [ "$SERVICE_OK" = 1 ]; then
+    ok "Done! sender-server is running in the background and starts on login/boot."
+    if [ "$OS" = "Linux" ]; then
+      echo "    logs:  journalctl --user -u sender -f"
+      echo "    stop:  systemctl --user stop sender   (disable autostart: disable)"
+    else
+      echo "    logs:  tail -f ~/Library/Logs/sender-server.log"
+      echo "    stop:  launchctl bootout gui/$(id -u)/com.sender.server"
+    fi
+    echo
+    echo "Want the TUI + pairing QR instead? Stop the service first, then run:"
+    echo "    sender-server"
+  else
+    ok "Done! Start the server with:"
+    echo "    sender-server"
+  fi
   echo
   echo "Then on your phone: open the Sender app in Expo Go and tap"
   echo "“📷 Scan laptop QR” pointing at the QR in the server window."
   echo "Both devices must be on the same Wi-Fi."
+}
+
+# --- background service (start now + autostart on login/boot) ----------------
+# Linux: systemd user unit. macOS: launchd agent. Best-effort: never fails
+# the install — falls back to manual start with instructions.
+SERVICE_OK=0
+
+install_service() {
+  [ "$NO_SERVICE" = 1 ] && { info "Skipping background service (--no-service)."; return; }
+  if [ "$OS" = "Linux" ]; then
+    install_systemd_service || warn "Could not set up autostart — start manually: sender-server"
+  else
+    install_launchd_service || warn "Could not set up autostart — start manually: sender-server"
+  fi
+}
+
+install_systemd_service() {
+  have systemctl || return 1
+  systemctl --user show-environment >/dev/null 2>&1 || return 1
+  local unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+  mkdir -p "$unit_dir"
+  cat > "$unit_dir/sender.service" <<EOF
+[Unit]
+Description=Sender — phone ⇄ laptop sync server
+Documentation=https://github.com/mamounhisham1/sender
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$BIN_DIR/sender-server --headless
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+EOF
+  systemctl --user daemon-reload
+  # hand the graphical session env to the user manager so clipboard works
+  systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
+  systemctl --user enable --now sender.service
+  # start at boot even before first login (needs privilege — best effort)
+  loginctl enable-linger "$USER" 2>/dev/null \
+    || warn "linger not enabled — service starts at login instead of boot."
+  systemctl --user is-active --quiet sender.service || return 1
+  ok "Background service running (sender.service)"
+  SERVICE_OK=1
+}
+
+install_launchd_service() {
+  local plist="$HOME/Library/LaunchAgents/com.sender.server.plist"
+  mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
+  cat > "$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.sender.server</string>
+  <key>ProgramArguments</key><array><string>$BIN_DIR/sender-server</string><string>--headless</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/sender-server.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/sender-server.log</string>
+</dict>
+</plist>
+EOF
+  local target="gui/$(id -u)/com.sender.server"
+  launchctl bootout "$target" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "$plist" || return 1
+  ok "Background service running (com.sender.server)"
+  SERVICE_OK=1
 }
 
 # --- fast path: prebuilt binary --------------------------------------------
@@ -82,6 +169,7 @@ if [ "$FROM_SOURCE" = 0 ]; then
   if curl -fsSL "$URL" -o "$TMP/sender.tar.gz"; then
     tar -xzf "$TMP/sender.tar.gz" -C "$TMP"
     install_binary "$TMP/sender-server"
+    install_service
     print_next_steps
     exit 0
   fi
@@ -139,4 +227,5 @@ info "Building sender-server (release, first build takes a few minutes)…"
 cargo build --release --manifest-path "$DEST/server/Cargo.toml"
 
 install_binary "$DEST/server/target/release/sender-server"
+install_service
 print_next_steps
